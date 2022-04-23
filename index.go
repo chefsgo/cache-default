@@ -1,13 +1,13 @@
 package default_cache
 
 import (
-	"github.com/chefsgo/chef"
+	"github.com/chefsgo/cache"
 )
 
-func Driver() chef.CacheDriver {
-	return &defaultCacheDriver{}
+func Driver() cache.Driver {
+	return &defaultDriver{}
 }
 
 func init() {
-	chef.Register("default", Driver())
+	cache.Register("default", Driver())
 }

@@ -8,55 +8,55 @@ import (
 	"time"
 
 	. "github.com/chefsgo/base"
-	"github.com/chefsgo/chef"
+	"github.com/chefsgo/cache"
 )
 
 var (
 	errInvalidCacheConnection = errors.New("Invalid cache connection.")
+	errInvalidCacheData       = errors.New("Invalid cache data.")
 )
 
 type (
-	defaultCacheDriver  struct{}
-	defaultCacheConnect struct {
+	defaultDriver  struct{}
+	defaultConnect struct {
 		mutex   sync.RWMutex
 		name    string
-		config  chef.CacheConfig
-		setting defaultCacheSetting
+		config  cache.Config
+		setting defaultSetting
 		caches  sync.Map
 	}
-	defaultCacheSetting struct {
-		Expiry time.Duration
+	defaultSetting struct {
 	}
-	defaultCacheValue struct {
+	defaultValue struct {
 		Value  Any
 		Expiry time.Time
 	}
 )
 
 //连接
-func (driver *defaultCacheDriver) Connect(name string, config chef.CacheConfig) (chef.CacheConnect, error) {
-	setting := defaultCacheSetting{}
+func (driver *defaultDriver) Connect(name string, config cache.Config) (cache.Connect, error) {
+	setting := defaultSetting{}
 
-	return &defaultCacheConnect{
+	return &defaultConnect{
 		name: name, config: config, setting: setting,
 		caches: sync.Map{},
 	}, nil
 }
 
 //打开连接
-func (connect *defaultCacheConnect) Open() error {
+func (connect *defaultConnect) Open() error {
 	return nil
 }
 
 //关闭连接
-func (connect *defaultCacheConnect) Close() error {
+func (connect *defaultConnect) Close() error {
 	return nil
 }
 
 //查询缓存，
-func (connect *defaultCacheConnect) Read(key string) (Any, error) {
+func (connect *defaultConnect) Read(key string) (Any, error) {
 	if value, ok := connect.caches.Load(key); ok {
-		if vv, ok := value.(defaultCacheValue); ok {
+		if vv, ok := value.(defaultValue); ok {
 			if vv.Expiry.Unix() > time.Now().Unix() {
 				return vv.Value, nil
 			} else {
@@ -65,15 +65,15 @@ func (connect *defaultCacheConnect) Read(key string) (Any, error) {
 			}
 		}
 	}
-	return nil, errInvalidCacheConnection
+	return nil, errInvalidCacheData
 }
 
 //更新缓存
-func (connect *defaultCacheConnect) Write(key string, val Any, expiry time.Duration) error {
+func (connect *defaultConnect) Write(key string, val Any, expiry time.Duration) error {
 	now := time.Now()
 
-	value := defaultCacheValue{
-		Value: val, Expiry: now.Add(connect.setting.Expiry),
+	value := defaultValue{
+		Value: val, Expiry: now.Add(expiry),
 	}
 
 	connect.caches.Store(key, value)
@@ -82,7 +82,7 @@ func (connect *defaultCacheConnect) Write(key string, val Any, expiry time.Durat
 }
 
 //查询缓存，
-func (connect *defaultCacheConnect) Exists(key string) (bool, error) {
+func (connect *defaultConnect) Exists(key string) (bool, error) {
 	if _, ok := connect.caches.Load(key); ok {
 		return ok, nil
 	}
@@ -90,12 +90,12 @@ func (connect *defaultCacheConnect) Exists(key string) (bool, error) {
 }
 
 //删除缓存
-func (connect *defaultCacheConnect) Delete(key string) error {
+func (connect *defaultConnect) Delete(key string) error {
 	connect.caches.Delete(key)
 	return nil
 }
 
-func (connect *defaultCacheConnect) Serial(key string, start, step int64) (int64, error) {
+func (connect *defaultConnect) Serial(key string, start, step int64) (int64, error) {
 	value := start
 
 	if val, err := connect.Read(key); err == nil {
@@ -117,7 +117,7 @@ func (connect *defaultCacheConnect) Serial(key string, start, step int64) (int64
 	return value, nil
 }
 
-func (connect *defaultCacheConnect) Keys(prefix string) ([]string, error) {
+func (connect *defaultConnect) Keys(prefix string) ([]string, error) {
 	keys := []string{}
 
 	connect.caches.Range(func(k, _ Any) bool {
@@ -130,7 +130,7 @@ func (connect *defaultCacheConnect) Keys(prefix string) ([]string, error) {
 	})
 	return keys, nil
 }
-func (connect *defaultCacheConnect) Clear(prefix string) error {
+func (connect *defaultConnect) Clear(prefix string) error {
 	if keys, err := connect.Keys(prefix); err == nil {
 		for _, key := range keys {
 			connect.caches.Delete(key)
